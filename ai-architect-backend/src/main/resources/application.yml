@@ -1,0 +1,156 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: ai-architect-backend
+
+  # ── Redis ──
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 5000ms
+
+  # ── PostgreSQL + JPA ──
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/ai_architect}
+    username: ${DATABASE_USER:ai_architect}
+    password: ${DATABASE_PASSWORD:ai_architect}
+    driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:none}
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: ${DATABASE_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+        format_sql: false
+
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# ── AI Providers ──
+providers:
+  gemini:
+    keys:
+      - ${GEMINI_KEY_1:YOUR_GEMINI_KEY_1}
+      - ${GEMINI_KEY_2:YOUR_GEMINI_KEY_2}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    model: gemini-2.0-flash
+    fallback-model: gemini-2.0-flash-lite
+    rpm-limit: 15
+    enabled: true
+
+  openrouter:
+    keys:
+      - ${OPENROUTER_KEY_1:YOUR_OPENROUTER_KEY_1}
+      - ${OPENROUTER_KEY_2:YOUR_OPENROUTER_KEY_2}
+    base-url: https://openrouter.ai/api/v1
+    model: meta-llama/llama-3.3-70b-instruct:free
+    fallback-model: meta-llama/llama-3.1-8b-instruct:free
+    rpm-limit: 20
+    enabled: true
+
+  groq:
+    keys:
+      - ${GROQ_KEY_1:YOUR_GROQ_KEY_1}
+      - ${GROQ_KEY_2:YOUR_GROQ_KEY_2}
+    base-url: https://api.groq.com/openai/v1
+    model: llama-3.3-70b-versatile
+    fallback-model: mixtral-8x7b-32768
+    rpm-limit: 30
+    enabled: true
+
+  together:
+    keys:
+      - ${TOGETHER_KEY_1:YOUR_TOGETHER_KEY_1}
+      - ${TOGETHER_KEY_2:YOUR_TOGETHER_KEY_2}
+    base-url: https://api.together.xyz/v1
+    model: meta-llama/Llama-3.3-70B-Instruct-Turbo-Free
+    fallback-model: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+    rpm-limit: 60
+    enabled: true
+
+  cerebras:
+    keys:
+      - ${CEREBRAS_KEY_1:YOUR_CEREBRAS_KEY_1}
+      - ${CEREBRAS_KEY_2:YOUR_CEREBRAS_KEY_2}
+    base-url: https://api.cerebras.ai/v1
+    model: llama-3.3-70b
+    fallback-model: llama3.1-8b
+    rpm-limit: 30
+    enabled: true
+
+# ── Orchestration ──
+orchestration:
+  max-retries: 3
+  phase-delay-ms: 2000
+  request-delay-ms: 1500
+  phase-timeout-ms: 300000
+  session-ttl-minutes: 120
+  max-context-phases: 2
+
+# ── Resilience4j ──
+resilience4j:
+  retry:
+    instances:
+      providerRetry:
+        max-attempts: 3
+        wait-duration: 2s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  circuitbreaker:
+    instances:
+      providerCircuit:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+
+# ── Actuator ──
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# ── Logging ──
+logging:
+  level:
+    com.aiarchitect: DEBUG
+    org.springframework.web: INFO
+    org.flywaydb: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ── App ──
+app:
+  projects-dir: ${PROJECTS_DIR:${user.home}/ai-architect-projects}
+  knowledge-dir: ${KNOWLEDGE_DIR:${user.home}/ai-architect-knowledge}
+
+# ── Python Worker ──
+python:
+  worker:
+    url: ${PYTHON_WORKER_URL:http://localhost:8081}
+
+# ── Auth ──
+auth:
+  enabled: ${AUTH_ENABLED:false}
+  jwt-secret: ${JWT_SECRET:ai-architect-default-secret-change-in-production-32chars}
+  jwt-expiry-hours: ${JWT_EXPIRY_HOURS:24}
+  local-password: ${LOCAL_PASSWORD:}

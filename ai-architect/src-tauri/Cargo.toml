@@ -1,0 +1,27 @@
+[package]
+name    = "ai-architect"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name         = "ai_architect_lib"
+crate-type   = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "ai-architect"
+path = "src/main.rs"
+
+[dependencies]
+tauri = { version = "2", features = ["shell-open"] }
+tauri-plugin-shell    = "2"
+tauri-plugin-dialog   = "2"
+tauri-plugin-fs       = "2"
+tauri-plugin-process  = "2"
+tauri-plugin-updater  = "2"
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio      = { version = "1", features = ["full"] }
+
+[features]
+default          = ["custom-protocol"]
+custom-protocol  = ["tauri/custom-protocol"]

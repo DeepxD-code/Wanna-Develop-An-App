@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Default capabilities for AI Architect desktop app",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:default",
+    "shell:allow-open",
+    "fs:default",
+    "fs:allow-read-recursive",
+    "fs:allow-write-recursive",
+    "dialog:default",
+    "process:default",
+    "process:allow-exit",
+    "updater:default"
+  ]
+}

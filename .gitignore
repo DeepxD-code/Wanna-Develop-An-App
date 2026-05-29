@@ -1,0 +1,11 @@
+node_modules/
+.vite/
+target/
+*.class
+*.jar
+*.log
+.idea/
+*.iml
+.DS_Store
+.env.local
+dist/
