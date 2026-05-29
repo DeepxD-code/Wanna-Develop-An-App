@@ -25,6 +25,7 @@ export default function Sidebar({
   currentModel,
   onLaunch,
   onStop,
+  onReplay,
   onClose,        // mobile only
   isMobile,
 }) {

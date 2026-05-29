@@ -1,11 +1,14 @@
 node_modules/
 .vite/
 target/
+__pycache__/
 *.class
 *.jar
 *.log
+*.pyc
 .idea/
 *.iml
 .DS_Store
-.env.local
+.env
 dist/
+maven_log.txt

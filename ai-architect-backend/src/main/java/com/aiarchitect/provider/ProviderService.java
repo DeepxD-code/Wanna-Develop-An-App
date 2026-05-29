@@ -87,40 +87,48 @@ public class ProviderService {
                 continue;
             }
 
+            List<String> models = new ArrayList<>();
+            models.add(cfg.getModel());
+            if (cfg.getFallbackModel() != null && !cfg.getFallbackModel().isBlank()) {
+                models.add(cfg.getFallbackModel());
+            }
+
             List<String> keys = cfg.getValidKeys();
             for (int ki = 0; ki < keys.size(); ki++) {
                 if (abortFlag[0]) throw new InterruptedException("Aborted");
 
-                String key   = rotateKey(providerName, keys);
-                String model = cfg.getModel();
-                log.info("Trying provider={} model={}", providerName, model);
-                onProviderSwitch.accept(providerName, model);
-
-                for (int attempt = 0; attempt < orchProps.getMaxRetries(); attempt++) {
+                for (String model : models) {
                     if (abortFlag[0]) throw new InterruptedException("Aborted");
-                    if (attempt > 0) {
-                        onRetry.accept(attempt);
-                        Thread.sleep(orchProps.getRequestDelayMs() * (long) Math.pow(2, attempt));
-                    }
-                    try {
-                        String result = switch (providerName) {
-                            case "gemini"     -> streamGemini(cfg, key, prompt, onToken, abortFlag);
-                            default           -> streamOpenAICompat(cfg, key, prompt, onToken, abortFlag, cfg.getBaseUrl());
-                        };
-                        failCounts.getOrDefault(providerName, new AtomicInteger()).set(0);
-                        log.info("Phase complete via provider={}", providerName);
-                        return result;
-                    } catch (RateLimitException e) {
-                        log.warn("Rate limit {} key={}: {}", providerName, ki, e.getMessage());
-                        errors.add(providerName + " rate-limited");
-                        rateLimited.add(providerName);
-                        failCounts.computeIfAbsent(providerName, k -> new AtomicInteger()).incrementAndGet();
-                        Thread.sleep(1000);
-                        break;
-                    } catch (Exception e) {
-                        log.warn("Provider {} attempt {} failed: {}", providerName, attempt + 1, e.getMessage());
-                        errors.add(providerName + "[" + attempt + "]: " + e.getMessage());
-                        failCounts.computeIfAbsent(providerName, k -> new AtomicInteger()).incrementAndGet();
+                    String key = rotateKey(providerName, keys);
+                    log.info("Trying provider={} model={}", providerName, model);
+                    onProviderSwitch.accept(providerName, model);
+
+                    for (int attempt = 0; attempt < orchProps.getMaxRetries(); attempt++) {
+                        if (abortFlag[0]) throw new InterruptedException("Aborted");
+                        if (attempt > 0) {
+                            onRetry.accept(attempt);
+                            Thread.sleep(orchProps.getRequestDelayMs() * (long) Math.pow(2, attempt));
+                        }
+                        try {
+                            String result = switch (providerName) {
+                                case "gemini"     -> streamGemini(cfg, key, prompt, onToken, abortFlag, model);
+                                default           -> streamOpenAICompat(cfg, key, prompt, onToken, abortFlag, cfg.getBaseUrl(), model);
+                            };
+                            failCounts.getOrDefault(providerName, new AtomicInteger()).set(0);
+                            log.info("Phase complete via provider={}", providerName);
+                            return result;
+                        } catch (RateLimitException e) {
+                            log.warn("Rate limit {} key={} model={}: {}", providerName, ki, model, e.getMessage());
+                            errors.add(providerName + " rate-limited");
+                            rateLimited.add(providerName);
+                            failCounts.computeIfAbsent(providerName, k -> new AtomicInteger()).incrementAndGet();
+                            Thread.sleep(1000);
+                            break; // break to next model/key
+                        } catch (Exception e) {
+                            log.warn("Provider {} key={} model={} attempt {} failed: {}", providerName, ki, model, attempt + 1, e.getMessage());
+                            errors.add(providerName + "[" + attempt + "]: " + e.getMessage());
+                            failCounts.computeIfAbsent(providerName, k -> new AtomicInteger()).incrementAndGet();
+                        }
                     }
                 }
             }
@@ -133,8 +141,8 @@ public class ProviderService {
 
     private String streamGemini(ProviderProperties.ProviderConfig cfg, String key,
                                  String prompt, Consumer<String> onToken,
-                                 boolean[] abortFlag) throws Exception {
-        String url = cfg.getBaseUrl() + "/models/" + cfg.getModel()
+                                 boolean[] abortFlag, String model) throws Exception {
+        String url = cfg.getBaseUrl() + "/models/" + model
             + ":streamGenerateContent?alt=sse&key=" + key;
 
         String body = objectMapper.writeValueAsString(Map.of(
@@ -153,10 +161,10 @@ public class ProviderService {
     // ── OpenAI-compatible (Groq, OpenRouter, Together, Cerebras) ─
 
     private String streamOpenAICompat(ProviderProperties.ProviderConfig cfg, String key,
-                                       String prompt, Consumer<String> onToken,
-                                       boolean[] abortFlag, String baseUrl) throws Exception {
+                                        String prompt, Consumer<String> onToken,
+                                        boolean[] abortFlag, String baseUrl, String model) throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
-            "model", cfg.getModel(),
+            "model", model,
             "stream", true,
             "max_tokens", 8192,
             "messages", List.of(Map.of("role","user","content",prompt))
